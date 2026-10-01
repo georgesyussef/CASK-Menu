@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50 text-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CASK - Digital Menu</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#f59e0b">
+
+    <!-- Anti-Cache Meta Tags -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Alpine JS -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Firebase SDK (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <script>
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDVy6derGJrD8rWFcTc3roJlzQeOGBCyxA",
+            authDomain: "cask-menu-eac48.firebaseapp.com",
+            databaseURL: "https://cask-menu-eac48-default-rtdb.firebaseio.com",
+            projectId: "cask-menu-eac48",
+            storageBucket: "cask-menu-eac48.firebasestorage.app",
+            messagingSenderId: "725740193174",
+            appId: "1:725740193174:web:2200723011ee10e7d249b7"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="h-full font-sans antialiased flex flex-col bg-slate-50 text-slate-900 overflow-hidden"
+      x-data="clientApp()" x-init="initClient()">
+
+    <!-- Header Section -->
+    <header class="bg-white/95 backdrop-blur-md sticky top-0 z-40 border-b border-slate-200 px-4 py-3 shadow-sm flex-shrink-0">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+            <div class="flex items-center gap-3">
+                <img src="logo.png" alt="CASK Logo" class="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow" onerror="this.src='https://via.placeholder.com/48'">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black text-amber-600 tracking-wider leading-none">CASK</h1>
+                    <span class="text-[10px] sm:text-[11px] text-slate-500 uppercase tracking-widest font-bold">Restaurant & Lounge</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap justify-end w-full sm:w-auto">
+                <!-- Track My Order Button -->
+                <button @click="showTrackingModal = true" class="relative bg-amber-100 border border-amber-300 text-amber-800 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-sm hover:bg-amber-200 transition">
+                    <i class="fa-solid fa-location-dot text-amber-600"></i>
+                    <span>Track Order</span>
+                    <span x-show="myActiveOrders.length > 0" class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                </button>
+
+                <!-- Order Type Selection -->
+                <div class="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5">
+                    <select x-model="orderType" class="bg-transparent text-xs sm:text-sm font-bold text-slate-800 outline-none cursor-pointer">
+                        <option value="Dine-in">Dine-in</option>
+                        <option value="Takeaway">Takeaway / Delivery</option>
+                    </select>
+                </div>
+
+                <!-- Table Dropdown -->
+                <div x-show="orderType === 'Dine-in'" class="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm mt-1 sm:mt-0">
+                    <i class="fa-solid fa-chair text-amber-600 text-xs sm:text-sm"></i>
+                    <select x-model="selectedTable" class="bg-transparent text-xs sm:text-sm font-bold text-slate-800 outline-none cursor-pointer text-center">
+                        <template x-for="t in 20" :key="t">
+                            <option :value="'Table ' + t" x-text="'Table ' + t"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Staff Calls Quick Actions (For Dine-In) -->
+    <section x-show="orderType === 'Dine-in'" class="bg-white border-b border-slate-200 px-4 py-2 flex-shrink-0">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-2">
+            <button @click="sendStaffCall('Call Waiter')" class="flex-1 bg-slate-100 hover:bg-amber-500 hover:text-white text-slate-700 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-user-ninja text-amber-600"></i>
+                <span>Call Waiter</span>
+            </button>
+            <button @click="sendStaffCall('Coal Change')" class="flex-1 bg-slate-100 hover:bg-amber-500 hover:text-white text-slate-700 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-fire text-amber-600"></i>
+                <span>Shisha Coal</span>
+            </button>
+            <button @click="sendStaffCall('Request Bill')" class="flex-1 bg-slate-100 hover:bg-amber-500 hover:text-white text-slate-700 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-file-invoice-dollar text-amber-600"></i>
+                <span>Get Bill</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- MAIN BODY: Side Bar + Products Content -->
+    <div class="flex-1 flex overflow-hidden max-w-7xl w-full mx-auto">
+
+        <!-- LEFT SIDEBAR CATEGORY MENU -->
+        <aside class="w-36 sm:w-60 bg-white border-r border-slate-200 overflow-y-auto flex-shrink-0 p-2 sm:p-3 space-y-3">
+            
+            <!-- All Items Filter Button -->
+            <button @click="selectCategory('All', 'All')" 
+                    :class="(selectedMainCategory === 'All' && selectedSubCategory === 'All') ? 'bg-amber-500 text-white font-black shadow-md' : 'bg-slate-100 text-slate-700 font-bold hover:bg-slate-200'"
+                    class="w-full text-left px-3 py-2.5 rounded-xl text-xs flex items-center justify-between transition">
+                <span>All Menu Items</span>
+                <i class="fa-solid fa-utensils text-[10px]"></i>
+            </button>
+
+            <!-- Main Menu Categories Structure -->
+            <template x-for="group in menuStructure" :key="group.mainCategory">
+                <div class="space-y-1">
+                    <!-- Main Category Header -->
+                    <button @click="selectMainCategory(group.mainCategory)"
+                            :class="selectedMainCategory === group.mainCategory ? 'bg-amber-50 text-amber-800 font-black border-amber-300' : 'text-slate-800 font-extrabold hover:bg-slate-50 border-transparent'"
+                            class="w-full text-left px-2.5 py-2 rounded-lg text-xs uppercase tracking-wider flex items-center justify-between border transition">
+                        <span x-text="group.mainCategory"></span>
+                        <i class="fa-solid" :class="openMainCategories.includes(group.mainCategory) ? 'fa-chevron-down' : 'fa-chevron-right'" class="text-[9px]"></i>
+                    </button>
+
+                    <!-- Subcategories List -->
+                    <div x-show="openMainCategories.includes(group.mainCategory)" class="pl-2 space-y-1">
+                        <button @click="selectCategory(group.mainCategory, 'All')"
+                                :class="(selectedMainCategory === group.mainCategory && selectedSubCategory === 'All') ? 'bg-amber-500 text-white font-black shadow-sm' : 'text-amber-700 font-bold hover:bg-amber-50'"
+                                class="w-full text-left px-2.5 py-1 rounded-lg text-[11px] block transition truncate">
+                            <span x-text="'All ' + group.mainCategory"></span>
+                        </button>
+
+                        <template x-for="subCat in group.subCategories" :key="subCat">
+                            <button @click="selectCategory(group.mainCategory, subCat)"
+                                    :class="(selectedMainCategory === group.mainCategory && selectedSubCategory === subCat) ? 'bg-amber-500 text-white font-black shadow-sm' : 'text-slate-600 hover:bg-slate-100 font-medium'"
+                                    class="w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] block transition truncate">
+                                <span x-text="subCat"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </aside>
+
+        <!-- RIGHT ITEMS CONTAINER -->
+        <main class="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4 pb-28">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                <div>
+                    <h2 class="text-base font-black text-slate-800 uppercase tracking-wide" x-text="selectedSubCategory !== 'All' ? selectedSubCategory : ('All ' + selectedMainCategory)"></h2>
+                    <p class="text-[11px] text-slate-500" x-text="filteredMenuItems.length + ' Items Available'"></p>
+                </div>
+            </div>
+
+            <!-- Items List / Grid -->
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <template x-if="filteredMenuItems.length === 0">
+                    <div class="col-span-full py-12 text-center text-slate-400">
+                        <i class="fa-solid fa-utensils text-3xl mb-2 block text-slate-300"></i>
+                        <p class="text-xs font-semibold">No menu items available in this category.</p>
+                    </div>
+                </template>
+
+                <template x-for="item in filteredMenuItems" :key="item.id">
+                    <div class="bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 flex gap-3 sm:gap-4 shadow-sm hover:shadow-md transition items-start">
+                        <template x-if="item.image">
+                            <img :src="item.image" alt="Item Image" 
+                                 @click="openImageModal(item.image, item.name)"
+                                 class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-slate-100 flex-shrink-0 cursor-pointer hover:opacity-85 transition hover:scale-105 transform">
+                        </template>
+
+                        <div class="space-y-1 flex-1 min-w-0">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug" x-text="item.name"></h3>
+                                <template x-if="item.badge">
+                                    <span class="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full" x-text="item.badge"></span>
+                                </template>
+                            </div>
+                            
+                            <!-- Description / Ingredients Fix for Cellphone -->
+                            <template x-if="item.description">
+                                <p class="text-[11px] text-slate-500 leading-relaxed whitespace-normal break-words block w-full py-0.5" x-text="item.description"></p>
+                            </template>
+
+                            <div class="pt-1 flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+                                <span class="font-black text-amber-600 text-sm sm:text-base" x-text="'$' + Number(item.price).toFixed(2)"></span>
+
+                                <template x-if="item.available">
+                                    <div>
+                                        <template x-if="!getItemCartCount(item.id)">
+                                            <button @click="addToCart(item)" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1 rounded-xl text-xs transition shadow-sm flex items-center gap-1">
+                                                <i class="fa-solid fa-plus text-[9px]"></i> Add
+                                            </button>
+                                        </template>
+                                        <template x-if="getItemCartCount(item.id)">
+                                            <div class="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-xl p-1">
+                                                <button @click="decrementItemCard(item.id)" class="w-5 h-5 rounded-lg bg-white text-slate-800 text-xs font-bold shadow-sm">-</button>
+                                                <span class="text-xs font-bold text-amber-600 w-4 text-center" x-text="getItemCartCount(item.id)"></span>
+                                                <button @click="addToCart(item)" class="w-5 h-5 rounded-lg bg-amber-500 text-white text-xs font-bold">+</button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                                
+                                <template x-if="!item.available">
+                                    <span class="text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-lg">Sold Out</span>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </main>
+    </div>
+
+    <!-- Image Fullscreen Preview Modal -->
+    <div x-cloak x-show="showImageModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 transition-all">
+        <div @click.outside="showImageModal = false" class="relative max-w-3xl w-full bg-white rounded-3xl p-4 shadow-2xl space-y-3 flex flex-col items-center">
+            <button @click="showImageModal = false" class="absolute top-3 right-3 text-slate-500 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 w-9 h-9 rounded-full flex items-center justify-center font-bold z-10 transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="w-full text-center pt-1 px-8">
+                <h3 class="font-black text-slate-900 text-base sm:text-lg" x-text="selectedImageTitle"></h3>
+            </div>
+            <div class="w-full max-h-[75vh] flex items-center justify-center overflow-hidden rounded-2xl bg-slate-100">
+                <img :src="selectedImageUrl" :alt="selectedImageTitle" class="max-h-[75vh] w-auto max-w-full object-contain rounded-2xl shadow-inner">
+            </div>
+            <button @click="showImageModal = false" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-xs transition">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Burger Combo Selection Modal -->
+    <div x-cloak x-show="showComboModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div @click.outside="showComboModal = false" class="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-base" x-text="selectedComboItem ? selectedComboItem.name : ''"></h3>
+                    <p class="text-xs text-slate-500">Choose meal option:</p>
+                </div>
+                <button @click="showComboModal = false" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-3">
+                <button @click="confirmAddToCart(selectedComboItem, false)" class="w-full bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-400 rounded-2xl p-4 text-left flex justify-between items-center transition group">
+                    <div>
+                        <span class="font-bold text-sm text-slate-800 group-hover:text-amber-700">Regular Sandwich</span>
+                        <p class="text-[11px] text-slate-500">Served with fries aside</p>
+                    </div>
+                    <span class="font-black text-amber-600 text-sm" x-text="'$' + Number(selectedComboItem ? selectedComboItem.price : 0).toFixed(2)"></span>
+                </button>
+
+                <button @click="confirmAddToCart(selectedComboItem, true)" class="w-full bg-amber-50 hover:bg-amber-100 border-2 border-amber-400 rounded-2xl p-4 text-left flex justify-between items-center transition group">
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-black text-sm text-amber-900">Make it Combo</span>
+                            <span class="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">+ $3.00</span>
+                        </div>
+                        <p class="text-[11px] text-amber-800/80">Includes extra fries & soft drink</p>
+                    </div>
+                    <span class="font-black text-amber-700 text-base" x-text="'$' + (Number(selectedComboItem ? selectedComboItem.price : 0) + 3).toFixed(2)"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Floating Cart Bar -->
+    <div x-cloak x-show="cartTotalCount > 0" class="fixed bottom-4 left-4 right-4 z-40 max-w-xl mx-auto">
+        <button @click="showCartModal = true" class="w-full bg-amber-500 hover:bg-amber-600 text-white p-3.5 rounded-2xl font-black text-sm shadow-xl flex items-center justify-between border border-amber-300">
+            <div class="flex items-center gap-3">
+                <span class="bg-white text-amber-600 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shadow" x-text="cartTotalCount"></span>
+                <span>View Order</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span x-text="'$' + cartTotalPrice.toFixed(2)"></span>
+                <i class="fa-solid fa-chevron-right text-xs"></i>
+            </div>
+        </button>
+    </div>
+
+    <!-- Cart Modal -->
+    <div x-cloak x-show="showCartModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4">
+        <div @click.outside="showCartModal = false" class="bg-white border-t sm:border border-slate-200 rounded-t-3xl sm:rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-5 max-h-[92vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Your Order</h3>
+                    <p class="text-xs text-amber-600 font-bold" x-text="orderType === 'Dine-in' ? selectedTable : 'Takeaway / Delivery'"></p>
+                </div>
+                <button @click="showCartModal = false" class="text-slate-400 hover:text-slate-700 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="overflow-y-auto space-y-2.5 flex-1 pr-1">
+                <template x-for="cItem in cart" :key="cItem.cartItemId">
+                    <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 gap-4">
+                        <div>
+                            <h4 class="font-bold text-sm text-slate-800" x-text="cItem.name"></h4>
+                            <span class="text-xs text-amber-600 font-bold" x-text="'$' + (cItem.price * cItem.quantity).toFixed(2)"></span>
+                        </div>
+                        <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
+                            <button @click="updateCartQuantityByCartItemId(cItem.cartItemId, -1)" class="w-6 h-6 rounded-lg bg-slate-100 text-slate-800 text-xs font-bold">-</button>
+                            <span class="text-xs font-bold text-amber-600 w-4 text-center" x-text="cItem.quantity"></span>
+                            <button @click="updateCartQuantityByCartItemId(cItem.cartItemId, 1)" class="w-6 h-6 rounded-lg bg-amber-500 text-white text-xs font-bold">+</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Customer Details (Name & Phone for BOTH Dine-in & Takeaway) -->
+            <div class="space-y-2 border-t border-slate-100 pt-3">
+                <p class="text-xs font-bold text-slate-700">Customer Details:</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input type="text" x-model="customerInfo.name" placeholder="Your Name *" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-amber-500">
+                    <input type="tel" x-model="customerInfo.phone" placeholder="Phone Number *" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-amber-500">
+                </div>
+                <template x-if="orderType === 'Takeaway'">
+                    <input type="text" x-model="customerInfo.address" placeholder="Delivery Address..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-amber-500">
+                </template>
+            </div>
+
+            <div class="space-y-3 pt-2">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Notes / Special Requests</label>
+                    <textarea x-model="orderNotes" placeholder="e.g. Extra sauce, no onions..." rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none"></textarea>
+                </div>
+
+                <div class="flex justify-between items-center pt-2 text-base font-black border-t border-slate-100">
+                    <span class="text-slate-700">Total</span>
+                    <span class="text-amber-600" x-text="'$' + cartTotalPrice.toFixed(2)"></span>
+                </div>
+
+                <button @click="openConfirmModal()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-3.5 rounded-xl text-sm transition shadow-md">
+                    <span x-text="orderType === 'Dine-in' ? 'Send Order (Pending Approval)' : 'Confirm & Send via WhatsApp'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pre-Send Confirmation Modal (English with Items List Preview) -->
+    <div x-cloak x-show="showConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+        <div @click.outside="showConfirmModal = false" class="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl text-center space-y-4 max-h-[90vh] flex flex-col">
+            <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-xl font-black flex-shrink-0">
+                <i class="fa-solid fa-cart-shopping"></i>
+            </div>
+            
+            <div class="flex-shrink-0">
+                <h3 class="text-base font-extrabold text-slate-900">Review Your Selected Items</h3>
+                <p class="text-xs text-slate-500 mt-1">Please double check your order below:</p>
+            </div>
+
+            <!-- Items List Summary -->
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-left overflow-y-auto max-h-48 space-y-2 flex-1 my-1">
+                <template x-for="cItem in cart" :key="cItem.cartItemId">
+                    <div class="flex justify-between items-center text-xs text-slate-700 border-b border-slate-200/60 pb-2 last:border-b-0 last:pb-0">
+                        <div class="font-medium pr-2">
+                            <span class="font-bold text-amber-600" x-text="cItem.quantity + 'x'"></span>
+                            <span x-text="cItem.name"></span>
+                        </div>
+                        <span class="font-bold text-slate-900 whitespace-nowrap" x-text="'$' + (cItem.price * cItem.quantity).toFixed(2)"></span>
+                    </div>
+                </template>
+            </div>
+
+            <div class="flex justify-between items-center px-1 font-black text-sm text-slate-900 flex-shrink-0 border-t border-slate-100 pt-2">
+                <span>Total Amount:</span>
+                <span class="text-amber-600 text-base" x-text="'$' + cartTotalPrice.toFixed(2)"></span>
+            </div>
+
+            <div class="flex-shrink-0 pt-1 space-y-3">
+                <p class="text-xs text-slate-600 font-semibold leading-relaxed">
+                    Do you want to edit anything in your items, or shall we send the order?
+                </p>
+
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <button @click="showConfirmModal = false; showCartModal = true;" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs transition order-2 sm:order-1">
+                        ✏️ Edit Items
+                    </button>
+                    <button @click="confirmAndSubmitOrder()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl text-xs transition shadow-md order-1 sm:order-2">
+                        🚀 Send Order
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-Time Tracking Modal -->
+    <div x-cloak x-show="showTrackingModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div @click.outside="showTrackingModal = false" class="bg-white border-t sm:border border-slate-200 rounded-t-3xl sm:rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl space-y-5 min-h-[400px] max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-amber-600"></i> Track My Orders
+                </h3>
+                <button @click="showTrackingModal = false" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="overflow-y-auto space-y-4 flex-1 pr-1">
+                <template x-if="myActiveOrders.length === 0">
+                    <p class="text-center text-xs text-slate-400 py-8">No active orders found.</p>
+                </template>
+
+                <template x-for="ord in myActiveOrders" :key="ord.id">
+                    <div class="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-amber-600" x-text="'Order #' + ord.id"></span>
+                            <span class="text-[10px] text-slate-400" x-text="ord.timestamp"></span>
+                        </div>
+
+                        <!-- Tracking Stepper -->
+                        <div class="grid grid-cols-4 gap-1 text-center py-2 border-y border-slate-200">
+                            <div :class="ord.status === 'Pending Approval' ? 'text-amber-600 font-bold' : 'text-slate-400'" class="text-[10px]">
+                                <i class="fa-solid fa-hourglass-start block text-sm mb-1"></i> Approval
+                            </div>
+                            <div :class="ord.status === 'Preparing' ? 'text-blue-600 font-bold' : 'text-slate-400'" class="text-[10px]">
+                                <i class="fa-solid fa-fire-burner block text-sm mb-1"></i> Kitchen
+                            </div>
+                            <div :class="ord.status === 'Ready' ? 'text-emerald-600 font-bold' : 'text-slate-400'" class="text-[10px]">
+                                <i class="fa-solid fa-bell-concierge block text-sm mb-1"></i> Ready
+                            </div>
+                            <div :class="ord.status === 'Delivered' ? 'text-emerald-700 font-bold' : 'text-slate-400'" class="text-[10px]">
+                                <i class="fa-solid fa-circle-check block text-sm mb-1"></i> Received
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center pt-1">
+                            <span class="text-xs font-bold text-slate-700" x-text="'Total: $' + Number(ord.total).toFixed(2)"></span>
+                            <template x-if="ord.status === 'Ready'">
+                                <button @click="markAsDelivered(ord.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1 rounded-lg font-bold shadow-sm">
+                                    Confirm Delivered 👍
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Logic -->
+    <script>
+        const initialMenuItems = [
+          // FOOD - Starters
+          { id: 1, name: "White Sauce Salad (4 servings)", mainCategory: "Food", category: "Starters", price: 6.00, description: "Tomato, iceberg, sweet corn, white sauce", badge: "", available: true },
+          { id: 2, name: "Mustard Sauce Salad (4 servings)", mainCategory: "Food", category: "Starters", price: 6.00, description: "Tomato, iceberg, cucumber, sweetcorn, mustard sauce", badge: "", available: true },
+          { id: 3, name: "Coleslaw Salad (4 servings)", mainCategory: "Food", category: "Starters", price: 5.50, description: "Coleslaw, carrot, sweet corn, mayo sauce", badge: "", available: true },
+          { id: 4, name: "Wedges Platter", mainCategory: "Food", category: "Starters", price: 5.50, description: "", badge: "", available: true },
+          { id: 5, name: "French Fries Platter", mainCategory: "Food", category: "Starters", price: 4.50, description: "", badge: "", available: true },
+          { id: 6, name: "Mozzarella Sticks (10 pcs)", mainCategory: "Food", category: "Starters", price: 9.00, description: "", badge: "", available: true },
+          { id: 7, name: "Mozzarella Sticks (5 pcs)", mainCategory: "Food", category: "Starters", price: 5.50, description: "", badge: "", available: true },
+          { id: 8, name: "Breaded Jumbo Shrimp", mainCategory: "Food", category: "Starters", price: 8.00, description: "5 shrimps pieces served with thousand island sauce", badge: "New", available: true },
+          { id: 9, name: "Cask Loaded Fries", mainCategory: "Food", category: "Starters", price: 8.00, description: "Golden fries topped with a smashed 180g beef patty, melted cheddar cheese, fresh green onion served with our house smoky sauce", badge: "New", available: true },
+
+          // Sandwiches
+          { id: 10, name: "Lahme Mechwiye", mainCategory: "Food", category: "Sandwiches", price: 6.50, description: "Homos, french fries, biwaz, pickles", badge: "", available: true },
+          { id: 11, name: "Lahme Mechwiye Ghanam", mainCategory: "Food", category: "Sandwiches", price: 10.00, description: "250g Lahme mechwiye ghanam, homos, french fries, biwaz, pickles", badge: "", available: true },
+          { id: 12, name: "Kabab Mechwe", mainCategory: "Food", category: "Sandwiches", price: 6.00, description: "Homos, french fries, biwaz, pickles", badge: "", available: true },
+          { id: 13, name: "Sejouk", mainCategory: "Food", category: "Sandwiches", price: 6.00, description: "Tomato, sweetcorn, french fries, pickles, mayo", badge: "", available: true },
+          { id: 14, name: "Maqaneq", mainCategory: "Food", category: "Sandwiches", price: 6.00, description: "Tomato, french fries, pickles, pomegranate molasses, mayo", badge: "", available: true },
+          { id: 15, name: "Cask Loaf", mainCategory: "Food", category: "Sandwiches", price: 10.00, description: "Mozzarella cheese, pulled beef and sweet barbecue.", badge: "", available: true },
+          { id: 16, name: "Merguez Sausage", mainCategory: "Food", category: "Sandwiches", price: 6.50, description: "Merguez, tomato, pickles, french fries, mustard and mayonnaise", badge: "", available: true },
+          { id: 17, name: "Grilled Chicken Sandwich", mainCategory: "Food", category: "Sandwiches", price: 6.50, description: "Chicken Breast, coleslaw, fries, pickles and garlic", badge: "", available: true },
+
+          // Burger
+          { id: 18, name: "Cask Burger", mainCategory: "Food", category: "Burger", price: 8.00, description: "170g smashed Beef Patty, tomato, iceberg, special onion, pickles, special sauce served with french fries aside", badge: "Popular", available: true },
+          { id: 19, name: "Mushroom Cask Burger", mainCategory: "Food", category: "Burger", price: 10.00, description: "170g smashed Beef Patty, tomato, iceberg, pickles, special onion, mushroom, mozzarella, special sauce, served with french fries aside", badge: "Popular", available: true },
+          { id: 20, name: "Fish Burger", mainCategory: "Food", category: "Burger", price: 7.00, description: "Iceberg, tomato, special sauce, served with french fries", badge: "", available: true },
+          { id: 21, name: "Pulled Beef Burger", mainCategory: "Food", category: "Burger", price: 12.00, description: "Smoked pulled beef, coleslaw, and sweet barbecue served with fries aside", badge: "", available: true },
+          { id: 22, name: "Chicken Burger", mainCategory: "Food", category: "Burger", price: 9.00, description: "Chicken Breast, iceberg, tomato, thousand island sauce served with fries aside", badge: "", available: true },
+          { id: 23, name: "Black Angus Burger", mainCategory: "Food", category: "Burger", price: 9.00, description: "200g black angus Beef Patty, special onion, special sauce served with french fries aside", badge: "Popular", available: true },
+          { id: 24, name: "Mushroom Black Angus Burger", mainCategory: "Food", category: "Burger", price: 11.00, description: "200g black angus Beef Patty, special onion, mushroom, mozzarella cheese, special sauce served with french fries aside", badge: "Popular", available: true },
+          { id: 25, name: "The Goat Burger", mainCategory: "Food", category: "Burger", price: 11.00, description: "200g goat patty burger, tomato, iceberg, pickles, grilled onion, cheddar cheese, special sauce, served with fries aside", badge: "New", available: true },
+          { id: 26, name: "The Triple B Burger", mainCategory: "Food", category: "Burger", price: 14.00, description: "200g Black Angus beef, cheddar cheese, crispy bacon, grilled egg, grilled onions, smoky sauce, and smoked barbecue sauce, served with fries aside", badge: "New", available: true },
+          { id: 27, name: "Double Cheese Burger", mainCategory: "Food", category: "Burger", price: 15.00, description: "340g double beef patties with mozzarella, cheddar, onions, pickles, and our special sauce. Served with fries and dipped in warm cheddar cheese.", badge: "New", available: true },
+          { id: 28, name: "Truffle Black Angus Burger", mainCategory: "Food", category: "Burger", price: 12.50, description: "200g black angus Beef Patty, special onion, mushroom, mozzarella cheese, truffle mayo sauce served with french fries aside", badge: "New", available: true },
+
+          // Main Dishes
+          { id: 29, name: "Lahme Mechwiye Dish", mainCategory: "Food", category: "Main Dishes", price: 14.00, description: "Homos, grilled tomato, grilled onion, french fries, pickles", badge: "", available: true },
+          { id: 30, name: "Lahme Mechwiye Lamb", mainCategory: "Food", category: "Main Dishes", price: 21.00, description: "Homos, grilled tomato, grilled onion, french fries, pickles", badge: "", available: true },
+          { id: 31, name: "Kabab Mechwe Dish", mainCategory: "Food", category: "Main Dishes", price: 14.00, description: "Homos, grilled tomato, grilled onion, french fries, pickles", badge: "", available: true },
+          { id: 32, name: "Sojouq Dish", mainCategory: "Food", category: "Main Dishes", price: 12.50, description: "Coleslaw salad, garlic, onion, tomato, bell pepper, french fries, pickles, mayo", badge: "", available: true },
+          { id: 33, name: "Maqaneq Dish", mainCategory: "Food", category: "Main Dishes", price: 12.00, description: "Coleslaw salad, french fries, pickles, mayo, pomegranate molasses", badge: "", available: true },
+          { id: 34, name: "Grilled Chicken Dish", mainCategory: "Food", category: "Main Dishes", price: 13.00, description: "Chicken breast, white sauce salad, wedges, pickles with sauces garlic and hot sauce", badge: "", available: true },
+          { id: 35, name: "Mushroom Filet Steak Dish", mainCategory: "Food", category: "Main Dishes", price: 23.00, description: "Filet steak, mustard sauce salad mashed potato and mushroom sauce", badge: "", available: true },
+          { id: 36, name: "Pulled Beef Platter", mainCategory: "Food", category: "Main Dishes", price: 13.00, description: "Mashed potato, pulled beef and sweet barbecue.", badge: "", available: true },
+          { id: 37, name: "Tomahawk Dish", mainCategory: "Food", category: "Main Dishes", price: 43.00, description: "Mustard sauce salad, wedges, butter sauce, mushroom sauce, honey mustard", badge: "", available: true },
+          { id: 38, name: "650g Cask Meat Dish", mainCategory: "Food", category: "Main Dishes", price: 28.00, description: "Mustard sauce salad, wedges, sauces honey mustard, mushroom sauce, steak sauce", badge: "", available: true },
+          { id: 39, name: "Cask Special Dish", mainCategory: "Food", category: "Main Dishes", price: 23.00, description: "Ribeye steak, mustard sauce salad, wedges, honey mustard, mushroom sauce, steak sauce", badge: "Popular", available: true },
+          { id: 40, name: "Lamb Merguez Sausage Dish", mainCategory: "Food", category: "Main Dishes", price: 13.00, description: "Coleslaw salad, french fries, pickles, mayo, mustard", badge: "", available: true },
+          { id: 41, name: "Butter Steak", mainCategory: "Food", category: "Main Dishes", price: 25.00, description: "Ribeye steak, mustard sauce salad, wedges, butter, mushroom sauce, honey mustard, steak sauce", badge: "", available: true },
+          { id: 42, name: "Baby Shrimp", mainCategory: "Food", category: "Main Dishes", price: 13.00, description: "Coriander, garlic served with mustard sauce salad, french fries and thousand island", badge: "", available: true },
+          { id: 43, name: "Breaded Fish Filet", mainCategory: "Food", category: "Main Dishes", price: 15.00, description: "Served with mustard sauce salad, fries, thousand island and honey mustard", badge: "", available: true },
+          { id: 44, name: "Tenderloin Black Angus (300g)", mainCategory: "Food", category: "Main Dishes", price: 28.00, description: "Mustard sauce salad, mashed potato and mushroom sauce.", badge: "", available: true },
+          { id: 45, name: "Picanha Black Angus (250g)", mainCategory: "Food", category: "Main Dishes", price: 23.00, description: "Mustard sauce salad, wedges, honey mustard, mushroom sauce, steak sauce", badge: "", available: true },
+
+          // Smoked Meat (pre.ordered)
+          { id: 46, name: "2kg Pulled Pork", mainCategory: "Food", category: "Smoked Meat(pre.ordered)", price: 50.00, description: "Slow smoked to perfection, served with white sauce salad, mashed potato and sauces sweet BBQ, honey, buffalo, honey mustard", badge: "Popular", available: true },
+          { id: 47, name: "2.5kg Bone Beef Rib Plate", mainCategory: "Food", category: "Smoked Meat(pre.ordered)", price: 82.00, description: "Juicy beef ribs slow smoked to perfection served with white sauce salad, wedges and sauces sweet BBQ, honey, buffalo, honey mustard", badge: "", available: true },
+          { id: 48, name: "Cask Khad Bakar", mainCategory: "Food", category: "Smoked Meat(pre.ordered)", price: 25.00, description: "Slow smoked to perfection served with white sauce salad, mashed potato and sauces sweet BBQ, honey, buffalo, honey mustard", badge: "", available: true },
+          { id: 49, name: "1.5kg Brisket Platter", mainCategory: "Food", category: "Smoked Meat(pre.ordered)", price: 55.00, description: "Slow smoked to perfection served with white sauce salad, wedges and sauces sweet BBQ, honey, buffalo, chimichurri", badge: "", available: true },
+          { id: 50, name: "Cask Isen Bakar", mainCategory: "Food", category: "Smoked Meat(pre.ordered)", price: 25.00, description: "Slow smoked to perfection served with mustard sauce salad, wedges and garlic sauce", badge: "", available: true },
+          { id: 51, name: "Cask Lamb Shoulder", mainCategory: "Food", category: "Smoked Meat(pre.ordered)", price: 115.00, description: "Slow smoked to perfection served with rice, mashed potato and sauces sweet BBQ, honey, buffalo, mushroom sauce", badge: "Popular", available: true },
+          { id: 52, name: "Cask Smoked Beef Neck", mainCategory: "Food", category: "Smoked Meat(pre.ordered)", price: 46.00, description: "White sauce salad, wedges and sauces sweet BBQ, honey, honey mustard, buffalo", badge: "New", available: true },
+          { id: 53, name: "Ras Nifa", mainCategory: "Food", category: "Smoked Meat(pre.ordered)", price: 30.00, description: "Served with mustard sauce salad, wedges and garlic sauce.", badge: "New", available: true },
+          { id: 54, name: "2.5 KG Smoked Chicken", mainCategory: "Food", category: "Smoked Meat(pre.ordered)", price: 50.00, description: "Rice, minced meat, potato, carrots, mushroom and gravy sauce", badge: "", available: true },
+          { id: 55, name: "Smoked Goat Shoulder", mainCategory: "Food", category: "Smoked Meat(pre.ordered)", price: 115.00, description: "Slow smoked to perfection served with rice, mashed potato and sauces sweet BBQ, honey, honey mustard, buffalo, mushroom sauce", badge: "New", available: true },
+
+          // Add Sauces
+          { id: 56, name: "Sweet BBQ", mainCategory: "Food", category: "Add Sauces", price: 0.55, description: "", badge: "", available: true },
+          { id: 57, name: "Buffalo", mainCategory: "Food", category: "Add Sauces", price: 0.55, description: "", badge: "", available: true },
+          { id: 58, name: "Steak Sauce", mainCategory: "Food", category: "Add Sauces", price: 0.55, description: "", badge: "", available: true },
+          { id: 59, name: "Chimichurri", mainCategory: "Food", category: "Add Sauces", price: 2.00, description: "", badge: "", available: true },
+          { id: 60, name: "Mushroom Sauce", mainCategory: "Food", category: "Add Sauces", price: 1.50, description: "", badge: "", available: true },
+          { id: 61, name: "Honey Mustard", mainCategory: "Food", category: "Add Sauces", price: 0.55, description: "", badge: "", available: true },
+          { id: 62, name: "Garlic", mainCategory: "Food", category: "Add Sauces", price: 0.55, description: "", badge: "", available: true },
+          { id: 63, name: "Honey", mainCategory: "Food", category: "Add Sauces", price: 0.55, description: "", badge: "", available: true },
+          { id: 64, name: "Jalepino", mainCategory: "Food", category: "Add Sauces", price: 0.55, description: "", badge: "", available: true },
+          { id: 65, name: "Cocktail Sauce", mainCategory: "Food", category: "Add Sauces", price: 0.55, description: "", badge: "", available: true },
+          { id: 66, name: "Thousand Island", mainCategory: "Food", category: "Add Sauces", price: 1.00, description: "", badge: "", available: true },
+          { id: 67, name: "Truffle Sauce", mainCategory: "Food", category: "Add Sauces", price: 1.75, description: "", badge: "New", available: true },
+
+          // Breakfast
+          { id: 68, name: "Labne", mainCategory: "Food", category: "Breakfast", price: 1.30, description: "", badge: "", available: true },
+          { id: 69, name: "Haloum", mainCategory: "Food", category: "Breakfast", price: 2.20, description: "", badge: "", available: true },
+          { id: 70, name: "Beid", mainCategory: "Food", category: "Breakfast", price: 3.30, description: "", badge: "", available: true },
+          { id: 71, name: "Beid Be Awarma", mainCategory: "Food", category: "Breakfast", price: 5.00, description: "", badge: "", available: true },
+          { id: 72, name: "Olives", mainCategory: "Food", category: "Breakfast", price: 0.70, description: "", badge: "", available: true },
+          { id: 73, name: "Arich", mainCategory: "Food", category: "Breakfast", price: 1.70, description: "", badge: "", available: true },
+          { id: 74, name: "Chanklich", mainCategory: "Food", category: "Breakfast", price: 2.00, description: "", badge: "", available: true },
+
+          // BEVERAGES - Cold Drinks
+          { id: 75, name: "Soft Drinks Can", mainCategory: "Beverages", category: "Cold Drinks", price: 1.50, description: "", badge: "", available: true },
+          { id: 76, name: "Soft Drinks Plastic", mainCategory: "Beverages", category: "Cold Drinks", price: 1.20, description: "", badge: "", available: true },
+          { id: 77, name: "Ice Tea", mainCategory: "Beverages", category: "Cold Drinks", price: 1.50, description: "", badge: "", available: true },
+          { id: 78, name: "Rim Sparkling Water", mainCategory: "Beverages", category: "Cold Drinks", price: 1.20, description: "", badge: "", available: true },
+          { id: 79, name: "Tonic", mainCategory: "Beverages", category: "Cold Drinks", price: 1.50, description: "", badge: "", available: true },
+          { id: 80, name: "Water Small", mainCategory: "Beverages", category: "Cold Drinks", price: 0.44, description: "", badge: "", available: true },
+          { id: 81, name: "Water Big", mainCategory: "Beverages", category: "Cold Drinks", price: 0.88, description: "", badge: "", available: true },
+
+          // Hot Drinks
+          { id: 82, name: "Tea", mainCategory: "Beverages", category: "Hot Drinks", price: 0.90, description: "", badge: "", available: true },
+          { id: 83, name: "Nescafe 3in1", mainCategory: "Beverages", category: "Hot Drinks", price: 1.00, description: "", badge: "", available: true },
+          { id: 84, name: "Nescafe 2in1", mainCategory: "Beverages", category: "Hot Drinks", price: 1.00, description: "", badge: "", available: true },
+          { id: 85, name: "Cappucino", mainCategory: "Beverages", category: "Hot Drinks", price: 1.00, description: "", badge: "", available: true },
+          { id: 86, name: "Small Coffee Pot", mainCategory: "Beverages", category: "Hot Drinks", price: 1.89, description: "", badge: "", available: true },
+          { id: 87, name: "Medium Coffee Pot", mainCategory: "Beverages", category: "Hot Drinks", price: 2.78, description: "", badge: "", available: true },
+          { id: 88, name: "Big Coffee Pot", mainCategory: "Beverages", category: "Hot Drinks", price: 3.89, description: "", badge: "", available: true },
+
+          // TOBACCO - Shisha
+          { id: 89, name: "Hamoud And Naanaa", mainCategory: "Tobacco", category: "Shisha", price: 7.79, description: "", badge: "", available: true },
+          { id: 90, name: "Tefehten", mainCategory: "Tobacco", category: "Shisha", price: 7.79, description: "", badge: "", available: true },
+          { id: 91, name: "Ghyar Ras", mainCategory: "Tobacco", category: "Shisha", price: 4.00, description: "", badge: "", available: true },
+
+          // ALCOHOL DRINKS - Whiskey
+          { id: 92, name: "Red Label Glass", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 3.50, description: "", badge: "", available: true },
+          { id: 93, name: "Red Label Half Bottle", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 15.00, description: "", badge: "", available: true },
+          { id: 94, name: "Red Label Bottle", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 35.00, description: "", badge: "", available: true },
+          { id: 95, name: "Black Label Glass", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 6.00, description: "", badge: "", available: true },
+          { id: 96, name: "Black Label Half Bottle", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 28.00, description: "", badge: "", available: true },
+          { id: 97, name: "Black Label Bottle", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 55.00, description: "", badge: "", available: true },
+          { id: 98, name: "Jameson Glass", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 4.50, description: "", badge: "", available: true },
+          { id: 99, name: "Jameson Bottle", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 40.00, description: "", badge: "", available: true },
+          { id: 100, name: "Dewar's 12 Glass", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 4.50, description: "", badge: "", available: true },
+          { id: 101, name: "Dewar's 12 Bottle", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 50.00, description: "", badge: "", available: true },
+          { id: 102, name: "Chivas Regal Glass", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 6.00, description: "", badge: "", available: true },
+          { id: 103, name: "Chivas Regal Bottle", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 55.00, description: "", badge: "", available: true },
+          { id: 104, name: "Local Apple Brandy Bottle", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 20.00, description: "", badge: "", available: true },
+          { id: 105, name: "Local Apple Brandy Glass", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 4.50, description: "", badge: "", available: true },
+          { id: 106, name: "Double Black Glass", mainCategory: "Alcohol Drinks", category: "Whiskey", price: 10.00, description: "", badge: "", available: true },
+
+          // Vodka
+          { id: 107, name: "Vodka Tonic Glass", mainCategory: "Alcohol Drinks", category: "Vodka", price: 2.50, description: "", badge: "", available: true },
+          { id: 108, name: "Vodka Soft Drink Glass", mainCategory: "Alcohol Drinks", category: "Vodka", price: 2.50, description: "", badge: "", available: true },
+          { id: 109, name: "Vodka Bottle", mainCategory: "Alcohol Drinks", category: "Vodka", price: 15.00, description: "", badge: "", available: true },
+
+          // Gin
+          { id: 110, name: "Hendrick's Tonic Glass", mainCategory: "Alcohol Drinks", category: "Gin", price: 5.50, description: "", badge: "", available: true },
+          { id: 111, name: "Hendrick's Glass", mainCategory: "Alcohol Drinks", category: "Gin", price: 5.00, description: "", badge: "", available: true },
+          { id: 112, name: "Gin Basil", mainCategory: "Alcohol Drinks", category: "Gin", price: 5.50, description: "", badge: "", available: true },
+          { id: 113, name: "Hendrick's Bottle", mainCategory: "Alcohol Drinks", category: "Gin", price: 45.00, description: "", badge: "", available: true },
+
+          // Jagermeister
+          { id: 114, name: "Jagermeister Shot", mainCategory: "Alcohol Drinks", category: "Jagermeister", price: 2.00, description: "", badge: "", available: true },
+          { id: 115, name: "Jagermeister Glass", mainCategory: "Alcohol Drinks", category: "Jagermeister", price: 5.00, description: "", badge: "", available: true },
+
+          // Wine
+          { id: 116, name: "Local Red Wine Glass", mainCategory: "Alcohol Drinks", category: "Wine", price: 4.50, description: "", badge: "", available: true },
+          { id: 117, name: "Local White Wine Glass", mainCategory: "Alcohol Drinks", category: "Wine", price: 4.50, description: "", badge: "", available: true },
+          { id: 118, name: "Local Rose Wine Glass", mainCategory: "Alcohol Drinks", category: "Wine", price: 4.50, description: "", badge: "", available: true },
+          { id: 119, name: "Local Red Wine Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 18.00, description: "", badge: "", available: true },
+          { id: 120, name: "Local White Wine Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 18.00, description: "", badge: "", available: true },
+          { id: 121, name: "Local Rose Wine Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 18.00, description: "", badge: "", available: true },
+          { id: 122, name: "Ksara Reserve Du Couvant 1/2 Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 13.00, description: "", badge: "", available: true },
+          { id: 123, name: "Ksara Reserve Du Couvant Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 23.00, description: "", badge: "", available: true },
+          { id: 124, name: "Ksara Le Prieure 1/2 Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 12.00, description: "", badge: "", available: true },
+          { id: 125, name: "Ksara Sunset Half Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 12.00, description: "", badge: "", available: true },
+          { id: 126, name: "Ksara Sunset Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 22.00, description: "", badge: "", available: true },
+          { id: 127, name: "Ksara Blanc De Blancs Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 25.00, description: "", badge: "", available: true },
+          { id: 128, name: "Kefraya Blanc De Blancs Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 20.00, description: "", badge: "", available: true },
+          { id: 129, name: "Kefraya Myst Rose Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 18.00, description: "", badge: "", available: true },
+          { id: 130, name: "Chateau Ka Red Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 15.00, description: "", badge: "", available: true },
+          { id: 131, name: "Chateau Ka White Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 15.00, description: "", badge: "", available: true },
+          { id: 132, name: "Chateau Ka Rose Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 15.00, description: "", badge: "", available: true },
+          { id: 133, name: "Chateau Wadih Blue Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 20.00, description: "", badge: "", available: true },
+          { id: 134, name: "IXSIR Red Bottle", mainCategory: "Alcohol Drinks", category: "Wine", price: 25.00, description: "", badge: "", available: true },
+
+          // Beer
+          { id: 135, name: "Beirut Beer", mainCategory: "Alcohol Drinks", category: "Beer", price: 2.50, description: "", badge: "", available: true },
+          { id: 136, name: "Almaza", mainCategory: "Alcohol Drinks", category: "Beer", price: 3.50, description: "", badge: "", available: true },
+          { id: 137, name: "Almaza Dark", mainCategory: "Alcohol Drinks", category: "Beer", price: 3.50, description: "", badge: "", available: true },
+          { id: 138, name: "Almaza Light", mainCategory: "Alcohol Drinks", category: "Beer", price: 3.50, description: "", badge: "", available: true },
+          { id: 139, name: "Heineken", mainCategory: "Alcohol Drinks", category: "Beer", price: 4.00, description: "", badge: "", available: true },
+          { id: 140, name: "Add Mexican", mainCategory: "Alcohol Drinks", category: "Beer", price: 1.00, description: "", badge: "", available: true },
+
+          // Arak
+          { id: 141, name: "Arak Glass", mainCategory: "Alcohol Drinks", category: "Arak", price: 2.50, description: "", badge: "", available: true },
+          { id: 142, name: "Arak Jug", mainCategory: "Alcohol Drinks", category: "Arak", price: 4.50, description: "", badge: "", available: true }
+        ];
+
+        function clientApp() {
+            return {
+                restaurantWhatsappPhone: '96171999867',
+                orderType: 'Dine-in',
+                selectedTable: 'Table 1',
+                selectedMainCategory: 'Food',
+                selectedSubCategory: 'All',
+                openMainCategories: ['Food', 'Beverages', 'Tobacco', 'Alcohol Drinks'],
+                
+                menuStructure: [
+                    { mainCategory: 'Food', subCategories: ['Starters', 'Sandwiches', 'Burger', 'Main Dishes', 'Smoked Meat(pre.ordered)', 'Add Sauces', 'Breakfast'] },
+                    { mainCategory: 'Beverages', subCategories: ['Cold Drinks', 'Hot Drinks'] },
+                    { mainCategory: 'Tobacco', subCategories: ['Shisha'] },
+                    { mainCategory: 'Alcohol Drinks', subCategories: ['Whiskey', 'Vodka', 'Gin', 'Jagermeister', 'Wine', 'Beer', 'Arak'] }
+                ],
+
+                menuItems: [],
+                cart: [],
+                orderNotes: '',
+                customerInfo: { name: '', phone: '', address: '' },
+                showCartModal: false,
+                showConfirmModal: false,
+                showTrackingModal: false,
+                showComboModal: false,
+                showImageModal: false,
+                selectedImageUrl: '',
+                selectedImageTitle: '',
+                selectedComboItem: null,
+                allOrders: {},
+                myOrderIds: JSON.parse(localStorage.getItem('cask_my_orders') || '[]'),
+
+                getMainCategoryBySub(subCat) {
+                    for (const group of this.menuStructure) {
+                        if (group.subCategories.includes(subCat)) {
+                            return group.mainCategory;
+                        }
+                    }
+                    return 'Food';
+                },
+
+                initClient() {
+                    // Firebase Realtime Menu Sync
+                    db.ref('menu').on('value', (snapshot) => {
+                        const data = snapshot.val();
+                        if (data && data.length > 0) {
+                            this.menuItems = data;
+                        } else {
+                            db.ref('menu').set(initialMenuItems);
+                            this.menuItems = initialMenuItems;
+                        }
+                    });
+
+                    // Firebase Realtime Orders Sync
+                    db.ref('orders').on('value', (snapshot) => {
+                        this.allOrders = snapshot.val() || {};
+                    });
+                },
+
+                openImageModal(url, title) {
+                    this.selectedImageUrl = url;
+                    this.selectedImageTitle = title || '';
+                    this.showImageModal = true;
+                },
+
+                selectMainCategory(mainCat) {
+                    this.selectedMainCategory = mainCat;
+                    this.selectedSubCategory = 'All';
+                    if (!this.openMainCategories.includes(mainCat)) {
+                        this.openMainCategories.push(mainCat);
+                    }
+                },
+
+                selectCategory(mainCat, subCat) {
+                    this.selectedMainCategory = mainCat;
+                    this.selectedSubCategory = subCat;
+                },
+
+                get filteredMenuItems() {
+                    return this.menuItems.filter(item => {
+                        if (this.selectedMainCategory === 'All' && this.selectedSubCategory === 'All') return true;
+                        
+                        const itemMainCat = item.mainCategory || this.getMainCategoryBySub(item.category);
+
+                        let matchMain = true;
+                        if (this.selectedMainCategory !== 'All') {
+                            matchMain = (itemMainCat === this.selectedMainCategory);
+                        }
+
+                        let matchSub = true;
+                        if (this.selectedSubCategory !== 'All') {
+                            matchSub = (item.category === this.selectedSubCategory);
+                        }
+
+                        return matchMain && matchSub;
+                    });
+                },
+
+                get myActiveOrders() {
+                    return Object.values(this.allOrders)
+                        .filter(o => this.myOrderIds.includes(o.id))
+                        .reverse();
+                },
+
+                getItemCartCount(itemId) {
+                    return this.cart.filter(c => c.id === itemId).reduce((sum, c) => sum + c.quantity, 0);
+                },
+
+                addToCart(item) {
+                    if (item.category === 'Burger') {
+                        this.selectedComboItem = item;
+                        this.showComboModal = true;
+                    } else {
+                        this.confirmAddToCart(item, false);
+                    }
+                },
+
+                confirmAddToCart(item, isCombo) {
+                    if (!item) return;
+                    const cartItemId = item.id + (isCombo ? '_combo' : '_regular');
+                    const itemPrice = Number(item.price) + (isCombo ? 3.00 : 0);
+                    const itemName = item.name + (isCombo ? ' (Combo)' : '');
+
+                    const idx = this.cart.findIndex(c => c.cartItemId === cartItemId);
+                    if (idx !== -1) {
+                        this.cart[idx].quantity += 1;
+                    } else {
+                        this.cart.push({
+                            cartItemId: cartItemId,
+                            id: item.id,
+                            name: itemName,
+                            price: itemPrice,
+                            isCombo: isCombo,
+                            quantity: 1
+                        });
+                    }
+                    this.showComboModal = false;
+                },
+
+                decrementItemCard(itemId) {
+                    for (let i = this.cart.length - 1; i >= 0; i--) {
+                        if (this.cart[i].id === itemId) {
+                            this.cart[i].quantity -= 1;
+                            if (this.cart[i].quantity <= 0) {
+                                this.cart.splice(i, 1);
+                            }
+                            break;
+                        }
+                    }
+                    if (this.cart.length === 0) this.showCartModal = false;
+                },
+
+                updateCartQuantityByCartItemId(cartItemId, delta) {
+                    const idx = this.cart.findIndex(c => c.cartItemId === cartItemId);
+                    if (idx !== -1) {
+                        this.cart[idx].quantity += delta;
+                        if (this.cart[idx].quantity <= 0) {
+                            this.cart.splice(idx, 1);
+                        }
+                    }
+                    if (this.cart.length === 0) this.showCartModal = false;
+                },
+
+                get cartTotalCount() {
+                    return this.cart.reduce((sum, item) => sum + item.quantity, 0);
+                },
+
+                get cartTotalPrice() {
+                    return this.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                },
+
+                sendStaffCall(type) {
+                    const reqId = Date.now();
+                    const req = {
+                        id: reqId,
+                        table: this.selectedTable,
+                        type: type,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    };
+                    db.ref('staff_calls/' + reqId).set(req);
+                    alert(type + ' request sent to staff!');
+                },
+
+                markAsDelivered(orderId) {
+                    db.ref('orders/' + orderId + '/status').set('Delivered');
+                },
+
+                openConfirmModal() {
+                    if (this.cart.length === 0) return;
+                    if (!this.customerInfo.name.trim() || !this.customerInfo.phone.trim()) {
+                        alert('Please enter your name and phone number to confirm the order!');
+                        return;
+                    }
+                    this.showCartModal = false;
+                    this.showConfirmModal = true;
+                },
+
+                confirmAndSubmitOrder() {
+                    this.showConfirmModal = false;
+                    this.submitOrder();
+                },
+
+                submitOrder() {
+                    if (this.cart.length === 0) return;
+
+                    if (!this.customerInfo.name.trim() || !this.customerInfo.phone.trim()) {
+                        alert('Please enter your name and phone number to confirm the order!');
+                        return;
+                    }
+
+                    const orderId = Date.now();
+                    const orderObj = {
+                        id: orderId,
+                        type: this.orderType,
+                        tableNumber: this.orderType === 'Dine-in' ? this.selectedTable : 'Takeaway / Delivery',
+                        customerInfo: this.customerInfo,
+                        items: [...this.cart],
+                        total: this.cartTotalPrice,
+                        notes: this.orderNotes,
+                        status: 'Pending Approval',
+                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        timestampIso: new Date().toISOString()
+                    };
+
+                    this.myOrderIds.push(orderId);
+                    localStorage.setItem('cask_my_orders', JSON.stringify(this.myOrderIds));
+                    
+                    db.ref('orders/' + orderId).set(orderObj);
+
+                    if (this.orderType === 'Takeaway') {
+                        let itemsText = this.cart.map(i => `${i.quantity}x ${i.name} ($${(i.price * i.quantity).toFixed(2)})`).join('\n');
+                        let msg = `*New Order #${orderId}*\n*Name:* ${this.customerInfo.name}\n*Phone:* ${this.customerInfo.phone}\n*Address:* ${this.customerInfo.address}\n\n*Items:*\n${itemsText}\n\n*Total:* $${this.cartTotalPrice.toFixed(2)}`;
+                        window.open(`https://wa.me/${this.restaurantWhatsappPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+                    }
+
+                    alert('Order submitted successfully! Awaiting Admin approval.');
+                    this.cart = [];
+                    this.orderNotes = '';
+                    this.showCartModal = false;
+                    this.showTrackingModal = true;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
