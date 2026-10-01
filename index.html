@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50 text-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CASK - Restaurant</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#f59e0b">
+    
+    <!-- Anti-Cache Meta Tags -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</head>
+<body class="h-full flex flex-col justify-center items-center bg-slate-50 px-4 py-8 antialiased">
+
+    <!-- Background Glow Effect -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -left-40 w-96 h-96 bg-amber-200/40 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-amber-300/30 rounded-full blur-3xl"></div>
+    </div>
+
+    <!-- Main Container Card -->
+    <div class="relative z-10 max-w-md w-full bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl text-center space-y-8">
+        
+        <!-- LOGO Section -->
+        <div class="space-y-3">
+            <img src="logo.png" alt="CASK Logo" class="w-36 h-auto mx-auto object-contain drop-shadow-md transform hover:scale-105 transition duration-300" onerror="this.src='https://via.placeholder.com/150'">
+            <div>
+                <h1 class="text-3xl font-black tracking-wider text-amber-600 uppercase">CASK</h1>
+                <p class="text-xs text-slate-500 font-bold tracking-widest uppercase mt-1">Restaurant & Cafe</p>
+            </div>
+        </div>
+
+        <div class="h-1 w-16 bg-amber-500 mx-auto rounded-full"></div>
+
+        <!-- Navigation Buttons -->
+        <div class="space-y-4">
+            <!-- Client Menu Link -->
+            <a href="clients.html" class="group w-full flex items-center justify-between bg-amber-500 hover:bg-amber-600 text-slate-950 p-4 rounded-2xl font-black text-sm transition shadow-lg">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-utensils text-lg"></i>
+                    <span>Digital Menu</span>
+                </div>
+                <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition"></i>
+            </a>
+
+            <!-- Admin Panel Link -->
+            <a href="admin.html" class="group w-full flex items-center justify-between bg-slate-100 hover:bg-slate-200 text-slate-800 p-4 rounded-2xl font-bold text-sm transition">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-user-shield text-lg text-slate-600"></i>
+                    <span>Admin Dashboard</span>
+                </div>
+                <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition text-slate-400"></i>
+            </a>
+        </div>
+
+        <div class="text-[11px] text-slate-400 font-medium">
+            &copy; CASK Restaurant & Lounge. All rights reserved.
+        </div>
+    </div>
+
+</body>
+</html>
