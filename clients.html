@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50 text-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CASK - Digital Menu</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#f59e0b">
+
+    <!-- Anti-Cache Meta Tags -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Alpine JS -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Firebase SDK (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDVy6derGJrD8rWFcTc3roJlzQeOGBCyxA",
+            authDomain: "cask-menu-eac48.firebaseapp.com",
+            databaseURL: "https://cask-menu-eac48-default-rtdb.firebaseio.com",
+            projectId: "cask-menu-eac48",
+            storageBucket: "cask-menu-eac48.firebasestorage.app",
+            messagingSenderId: "725740193174",
+            appId: "1:725740193174:web:2200723011ee10e7d249b7"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="h-full font-sans antialiased flex flex-col bg-slate-50 text-slate-900 overflow-hidden"
+      x-data="clientApp()" x-init="initClient()">
+
+    <!-- Header Section -->
+    <header class="bg-white/95 backdrop-blur-md sticky top-0 z-40 border-b border-slate-200 px-4 py-3 shadow-sm flex-shrink-0">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+            <div class="flex items-center gap-3">
+                <img src="logo.png" alt="CASK Logo" class="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow" onerror="this.src='https://via.placeholder.com/48'">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black text-amber-600 tracking-wider leading-none">CASK</h1>
+                    <span class="text-[10px] sm:text-[11px] text-slate-500 uppercase tracking-widest font-bold">Restaurant & Lounge</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap justify-end w-full sm:w-auto">
+                <!-- Track My Order Button -->
+                <button @click="showTrackingModal = true" class="relative bg-amber-100 border border-amber-300 text-amber-800 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-sm hover:bg-amber-200 transition">
+                    <i class="fa-solid fa-location-dot text-amber-600"></i>
+                    <span>Track Order</span>
+                    <span x-show="myActiveOrders.length > 0" class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                </button>
+
+                <!-- Order Type Selection -->
+                <div class="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5">
+                    <select x-model="orderType" @change="handleOrderTypeChange()" class="bg-transparent text-xs sm:text-sm font-bold text-slate-800 outline-none cursor-pointer">
+                        <option value="Dine-in">Dine-in</option>
+                        <option value="Takeaway">Takeaway / Delivery</option>
+                    </select>
+                </div>
+
+                <!-- Table Dropdown -->
+                <div x-show="orderType === 'Dine-in'" class="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm mt-1 sm:mt-0">
+                    <i class="fa-solid fa-chair text-amber-600 text-xs sm:text-sm"></i>
+                    <select x-model="selectedTable" @change="checkTableApproval()" class="bg-transparent text-xs sm:text-sm font-bold text-slate-800 outline-none cursor-pointer text-center">
+                        <template x-for="t in 20" :key="t">
+                            <option :value="'Table ' + t" x-text="'Table ' + t"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Staff Calls Quick Actions -->
+    <section x-show="orderType === 'Dine-in'" class="bg-white border-b border-slate-200 px-4 py-2 flex-shrink-0">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-2">
+            <button @click="sendStaffCall('Call Waiter')" 
+                    :disabled="!isTableApproved"
+                    :class="!isTableApproved ? 'opacity-40 cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-slate-100 hover:bg-amber-500 hover:text-white text-slate-700'"
+                    class="flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-user-ninja text-amber-600"></i>
+                <span>Call Waiter</span>
+            </button>
+
+            <button @click="sendStaffCall('Coal Change')" 
+                    :disabled="!isTableApproved"
+                    :class="!isTableApproved ? 'opacity-40 cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-slate-100 hover:bg-amber-500 hover:text-white text-slate-700'"
+                    class="flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-fire text-amber-600"></i>
+                <span>Shisha Coal</span>
+            </button>
+
+            <button @click="sendStaffCall('Request Bill')" 
+                    :disabled="!isTableApproved"
+                    :class="!isTableApproved ? 'opacity-40 cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-slate-100 hover:bg-amber-500 hover:text-white text-slate-700'"
+                    class="flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-file-invoice-dollar text-amber-600"></i>
+                <span>Get Bill</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- Unapproved Table Banner -->
+    <section x-show="orderType === 'Dine-in' && !isTableApproved" class="bg-amber-50 border-b border-amber-200 px-4 py-2 flex-shrink-0 text-center">
+        <p class="text-xs text-amber-900 font-bold">
+            🔒 <span x-text="selectedTable"></span> is currently locked. Menu is visible, but placing orders and staff calls require Admin activation.
+        </p>
+    </section>
+
+    <!-- MAIN BODY -->
+    <div class="flex-1 flex overflow-hidden max-w-7xl w-full mx-auto">
+
+        <!-- LEFT SIDEBAR CATEGORY MENU -->
+        <aside class="w-36 sm:w-60 bg-white border-r border-slate-200 overflow-y-auto flex-shrink-0 p-2 sm:p-3 space-y-3">
+            <button @click="selectCategory('All', 'All')" 
+                    :class="(selectedMainCategory === 'All' && selectedSubCategory === 'All') ? 'bg-amber-500 text-white font-black shadow-md' : 'bg-slate-100 text-slate-700 font-bold hover:bg-slate-200'"
+                    class="w-full text-left px-3 py-2.5 rounded-xl text-xs flex items-center justify-between transition">
+                <span>All Menu Items</span>
+                <i class="fa-solid fa-utensils text-[10px]"></i>
+            </button>
+
+            <template x-for="group in dynamicMenuStructure" :key="group.mainCategory">
+                <div class="space-y-1">
+                    <button @click="selectMainCategory(group.mainCategory)"
+                            :class="selectedMainCategory === group.mainCategory ? 'bg-amber-50 text-amber-800 font-black border-amber-300' : 'text-slate-800 font-extrabold hover:bg-slate-50 border-transparent'"
+                            class="w-full text-left px-2.5 py-2 rounded-lg text-xs uppercase tracking-wider flex items-center justify-between border transition">
+                        <span x-text="group.mainCategory"></span>
+                        <i class="fa-solid" :class="openMainCategories.includes(group.mainCategory) ? 'fa-chevron-down' : 'fa-chevron-right'" class="text-[9px]"></i>
+                    </button>
+
+                    <div x-show="openMainCategories.includes(group.mainCategory)" class="pl-2 space-y-1">
+                        <button @click="selectCategory(group.mainCategory, 'All')"
+                                :class="(selectedMainCategory === group.mainCategory && selectedSubCategory === 'All') ? 'bg-amber-500 text-white font-black shadow-sm' : 'text-amber-700 font-bold hover:bg-amber-50'"
+                                class="w-full text-left px-2.5 py-1 rounded-lg text-[11px] block transition truncate">
+                            <span x-text="'All ' + group.mainCategory"></span>
+                        </button>
+
+                        <template x-for="subCat in group.subCategories" :key="subCat">
+                            <button @click="selectCategory(group.mainCategory, subCat)"
+                                    :class="(selectedMainCategory === group.mainCategory && selectedSubCategory === subCat) ? 'bg-amber-500 text-white font-black shadow-sm' : 'text-slate-600 hover:bg-slate-100 font-medium'"
+                                    class="w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] block transition truncate">
+                                <span x-text="subCat"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </aside>
+
+        <!-- RIGHT ITEMS CONTAINER -->
+        <main class="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4 pb-28">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                <div>
+                    <h2 class="text-base font-black text-slate-800 uppercase tracking-wide" x-text="selectedSubCategory !== 'All' ? selectedSubCategory : ('All ' + selectedMainCategory)"></h2>
+                    <p class="text-[11px] text-slate-500" x-text="filteredMenuItems.length + ' Items Available'"></p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <template x-if="filteredMenuItems.length === 0">
+                    <div class="col-span-full py-12 text-center text-slate-400">
+                        <i class="fa-solid fa-utensils text-3xl mb-2 block text-slate-300"></i>
+                        <p class="text-xs font-semibold">No menu items available in this category.</p>
+                    </div>
+                </template>
+
+                <template x-for="item in filteredMenuItems" :key="item.id">
+                    <div class="bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 flex gap-3 sm:gap-4 shadow-sm hover:shadow-md transition items-start">
+                        <template x-if="item.image">
+                            <img :src="item.image" alt="Item Image" 
+                                 @click="openImageModal(item)"
+                                 class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-slate-100 flex-shrink-0 cursor-pointer hover:opacity-85 transition hover:scale-105 transform">
+                        </template>
+
+                        <div class="space-y-1 flex-1 min-w-0">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug" x-text="item.name"></h3>
+                                <template x-if="item.badge">
+                                    <span class="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full" x-text="item.badge"></span>
+                                </template>
+                            </div>
+                            
+                            <template x-if="item.description">
+                                <p class="text-[11px] text-slate-500 leading-relaxed whitespace-normal break-words block w-full py-0.5" x-text="item.description"></p>
+                            </template>
+
+                            <div class="pt-1 flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+                                <span class="font-black text-amber-600 text-sm sm:text-base" x-text="'$' + Number(item.price).toFixed(2)"></span>
+
+                                <template x-if="item.available">
+                                    <div>
+                                        <template x-if="!getItemCartCount(item.id)">
+                                            <button @click="addToCart(item)" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1 rounded-xl text-xs transition shadow-sm flex items-center gap-1">
+                                                <i class="fa-solid fa-plus text-[9px]"></i> Add
+                                            </button>
+                                        </template>
+                                        <template x-if="getItemCartCount(item.id)">
+                                            <div class="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-xl p-1">
+                                                <button @click="decrementItemCard(item.id)" class="w-5 h-5 rounded-lg bg-white text-slate-800 text-xs font-bold shadow-sm">-</button>
+                                                <span class="text-xs font-bold text-amber-600 w-4 text-center" x-text="getItemCartCount(item.id)"></span>
+                                                <button @click="addToCart(item)" class="w-5 h-5 rounded-lg bg-amber-500 text-white text-xs font-bold">+</button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                                
+                                <template x-if="!item.available">
+                                    <span class="text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-lg">Sold Out</span>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </main>
+    </div>
+
+    <!-- Image Modal -->
+    <div x-cloak x-show="showImageModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+        <div @click.outside="showImageModal = false" class="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-5 shadow-2xl space-y-4 relative flex flex-col max-h-[90vh]">
+            <button @click="showImageModal = false" class="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-slate-900 text-white flex items-center justify-center transition shadow-md">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+            <div class="w-full h-60 sm:h-72 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100 flex-shrink-0">
+                <img :src="selectedImageUrl" :alt="selectedImageTitle" class="w-full h-full object-cover">
+            </div>
+            <div class="space-y-2 flex-1 overflow-y-auto pr-1">
+                <h3 class="font-black text-slate-900 text-lg sm:text-xl leading-snug" x-text="selectedImageTitle"></h3>
+                <template x-if="selectedImageDescription">
+                    <div class="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-3.5 space-y-1">
+                        <span class="text-[10px] font-black uppercase text-amber-700 tracking-wider block">Ingredients / Details:</span>
+                        <p class="text-xs text-slate-700 leading-relaxed font-medium" x-text="selectedImageDescription"></p>
+                    </div>
+                </template>
+            </div>
+            <button @click="showImageModal = false" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold py-3 rounded-xl text-xs transition">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Steak Doneness Modal -->
+    <div x-cloak x-show="showSteakModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div @click.outside="showSteakModal = false" class="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-base" x-text="selectedSteakItem ? selectedSteakItem.name : ''"></h3>
+                    <p class="text-xs text-amber-600 font-bold">Select Meat Doneness:</p>
+                </div>
+                <button @click="showSteakModal = false" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-2">
+                <template x-for="option in steakOptions" :key="option">
+                    <button @click="selectedDoneness = option" 
+                            :class="selectedDoneness === option ? 'bg-amber-500 text-white font-black border-amber-500 shadow-sm' : 'bg-slate-50 text-slate-700 hover:bg-amber-50 border-slate-200'"
+                            class="w-full text-left p-3 rounded-xl border text-xs font-bold transition flex justify-between items-center">
+                        <span x-text="option"></span>
+                        <i x-show="selectedDoneness === option" class="fa-solid fa-check text-xs"></i>
+                    </button>
+                </template>
+            </div>
+
+            <button @click="confirmAddToCart(selectedSteakItem, false, selectedDoneness)" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-3 rounded-xl text-xs transition shadow-md">
+                Confirm Doneness & Add
+            </button>
+        </div>
+    </div>
+
+    <!-- Soft Drink Options Modal -->
+    <div x-cloak x-show="showSoftDrinkModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div @click.outside="showSoftDrinkModal = false" class="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-base" x-text="selectedSoftDrinkItem ? selectedSoftDrinkItem.name : ''"></h3>
+                    <p class="text-xs text-amber-600 font-bold">Choose Soft Drink Flavor:</p>
+                </div>
+                <button @click="showSoftDrinkModal = false" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <template x-for="option in softDrinkOptions" :key="option">
+                    <button @click="selectedSoftDrinkOption = option" 
+                            :class="selectedSoftDrinkOption === option ? 'bg-amber-500 text-white font-black border-amber-500 shadow-sm' : 'bg-slate-50 text-slate-700 hover:bg-amber-50 border-slate-200'"
+                            class="text-center p-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1">
+                        <span x-text="option"></span>
+                    </button>
+                </template>
+            </div>
+
+            <button @click="confirmAddToCart(selectedSoftDrinkItem, false, null, selectedSoftDrinkOption)" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-3 rounded-xl text-xs transition shadow-md">
+                Confirm Selection & Add
+            </button>
+        </div>
+    </div>
+
+    <!-- Burger Combo Selection Modal -->
+    <div x-cloak x-show="showComboModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div @click.outside="showComboModal = false" class="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-base" x-text="selectedComboItem ? selectedComboItem.name : ''"></h3>
+                    <p class="text-xs text-slate-500">Choose meal option:</p>
+                </div>
+                <button @click="showComboModal = false" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-3">
+                <button @click="confirmAddToCart(selectedComboItem, false)" class="w-full bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-400 rounded-2xl p-4 text-left flex justify-between items-center transition group">
+                    <div>
+                        <span class="font-bold text-sm text-slate-800 group-hover:text-amber-700">Regular Burger</span>
+                        <p class="text-[11px] text-slate-500">Served with fries aside</p>
+                    </div>
+                    <span class="font-black text-amber-600 text-sm" x-text="'$' + Number(selectedComboItem ? selectedComboItem.price : 0).toFixed(2)"></span>
+                </button>
+
+                <button @click="confirmAddToCart(selectedComboItem, true)" class="w-full bg-amber-50 hover:bg-amber-100 border-2 border-amber-400 rounded-2xl p-4 text-left flex justify-between items-center transition group">
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-black text-sm text-amber-900">Make it Combo</span>
+                            <span class="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase" x-text="'+ $' + comboExtraPrice.toFixed(2)"></span>
+                        </div>
+                        <p class="text-[11px] text-amber-800/80">Includes 2 mozzarella sticks & soft drink</p>
+                    </div>
+                    <span class="font-black text-amber-700 text-base" x-text="'$' + (Number(selectedComboItem ? selectedComboItem.price : 0) + comboExtraPrice).toFixed(2)"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Order Tracking Modal -->
+    <div x-cloak x-show="showTrackingModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div @click.outside="showTrackingModal = false" class="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-location-dot text-amber-500 text-xl"></i>
+                    <h3 class="text-lg font-extrabold text-slate-900">Track My Orders</h3>
+                </div>
+                <button @click="showTrackingModal = false" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="overflow-y-auto space-y-3 flex-1 pr-1">
+                <template x-if="myActiveOrders.length === 0">
+                    <div class="text-center py-8 text-slate-400">
+                        <i class="fa-solid fa-receipt text-3xl mb-2 block text-slate-300"></i>
+                        <p class="text-xs font-semibold">No active pending/preparing orders found.</p>
+                    </div>
+                </template>
+
+                <template x-for="ord in myActiveOrders" :key="ord.id">
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-xs font-black text-amber-600 uppercase" x-text="ord.type === 'Takeaway' ? 'Takeaway' : ord.tableNumber"></span>
+                                <h4 class="text-sm font-bold text-slate-900" x-text="'Order #' + ord.id"></h4>
+                                <p class="text-[10px] text-slate-400" x-text="ord.timestamp"></p>
+                            </div>
+                            <span :class="{
+                                'bg-amber-100 text-amber-800 border-amber-300': ord.status === 'Pending Approval',
+                                'bg-blue-100 text-blue-800 border-blue-300': ord.status === 'Preparing',
+                                'bg-emerald-100 text-emerald-800 border-emerald-300': ord.status === 'Ready'
+                            }" class="border text-xs px-2.5 py-1 rounded-full font-black">
+                                <span x-text="ord.status"></span>
+                            </span>
+                        </div>
+
+                        <div class="border-t border-b border-slate-200 py-2 space-y-1">
+                            <template x-for="item in ord.items" :key="item.cartItemId || item.id">
+                                <div class="flex justify-between text-xs text-slate-700">
+                                    <span><span class="font-bold text-amber-600" x-text="item.quantity + 'x'"></span> <span x-text="item.name"></span></span>
+                                    <span x-text="'$' + (item.price * item.quantity).toFixed(2)"></span>
+                                </div>
+                            </template>
+                        </div>
+
+                        <template x-if="ord.notes">
+                            <p class="text-xs text-slate-600 font-semibold bg-amber-50 p-2 rounded-lg border border-amber-200" x-text="'Note: ' + ord.notes"></p>
+                        </template>
+
+                        <div class="flex justify-between items-center text-xs font-black text-slate-900 pt-1">
+                            <span>Total:</span>
+                            <span class="text-amber-600 text-sm" x-text="'$' + Number(ord.total).toFixed(2)"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Floating Cart Bar -->
+    <div x-cloak x-show="cartTotalCount > 0" class="fixed bottom-4 left-4 right-4 z-40 max-w-xl mx-auto">
+        <button @click="showCartModal = true" class="w-full bg-amber-500 hover:bg-amber-600 text-white p-3.5 rounded-2xl font-black text-sm shadow-xl flex items-center justify-between border border-amber-300">
+            <div class="flex items-center gap-3">
+                <span class="bg-white text-amber-600 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shadow" x-text="cartTotalCount"></span>
+                <span>View Order</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span x-text="'$' + cartTotalPrice.toFixed(2)"></span>
+                <i class="fa-solid fa-chevron-right text-xs"></i>
+            </div>
+        </button>
+    </div>
+
+    <!-- Cart Modal -->
+    <div x-cloak x-show="showCartModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4">
+        <div @click.outside="showCartModal = false" class="bg-white border-t sm:border border-slate-200 rounded-t-3xl sm:rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-5 max-h-[92vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Your Order</h3>
+                    <p class="text-xs text-amber-600 font-bold" x-text="orderType === 'Dine-in' ? selectedTable : 'Takeaway / Delivery'"></p>
+                </div>
+                <button @click="showCartModal = false" class="text-slate-400 hover:text-slate-700 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="overflow-y-auto space-y-2.5 flex-1 pr-1">
+                <template x-for="cItem in cart" :key="cItem.cartItemId">
+                    <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 gap-4">
+                        <div>
+                            <h4 class="font-bold text-sm text-slate-800" x-text="cItem.name"></h4>
+                            <span class="text-xs text-amber-600 font-bold" x-text="'$' + (cItem.price * cItem.quantity).toFixed(2)"></span>
+                        </div>
+                        <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1">
+                            <button @click="updateCartQuantityByCartItemId(cItem.cartItemId, -1)" class="w-6 h-6 rounded-lg bg-slate-100 text-slate-800 text-xs font-bold">-</button>
+                            <span class="text-xs font-bold text-amber-600 w-4 text-center" x-text="cItem.quantity"></span>
+                            <button @click="updateCartQuantityByCartItemId(cItem.cartItemId, 1)" class="w-6 h-6 rounded-lg bg-amber-500 text-white text-xs font-bold">+</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div class="space-y-2 border-t border-slate-100 pt-3">
+                <p class="text-xs font-bold text-slate-700">Customer Details:</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input type="text" x-model="customerInfo.name" placeholder="Your Name *" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-amber-500">
+                    <input type="tel" x-model="customerInfo.phone" placeholder="Phone Number *" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-amber-500">
+                </div>
+                <template x-if="orderType === 'Takeaway'">
+                    <input type="text" x-model="customerInfo.address" placeholder="Delivery Address..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-amber-500">
+                </template>
+            </div>
+
+            <div class="space-y-3 pt-2">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Notes / Special Requests</label>
+                    <textarea x-model="orderNotes" placeholder="e.g. Extra sauce, well done, no onions..." rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none"></textarea>
+                </div>
+
+                <div class="flex justify-between items-center pt-2 text-base font-black border-t border-slate-100">
+                    <span class="text-slate-700">Total</span>
+                    <span class="text-amber-600" x-text="'$' + cartTotalPrice.toFixed(2)"></span>
+                </div>
+
+                <button @click="openConfirmModal()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-3.5 rounded-xl text-sm transition shadow-md">
+                    <span x-text="orderType === 'Dine-in' ? 'Send Order (Pending Approval)' : 'Confirm & Send via WhatsApp'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pre-Send Confirmation Modal -->
+    <div x-cloak x-show="showConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+        <div @click.outside="showConfirmModal = false" class="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl text-center space-y-4 max-h-[90vh] flex flex-col">
+            <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-xl font-black flex-shrink-0">
+                <i class="fa-solid fa-cart-shopping"></i>
+            </div>
+            
+            <div class="flex-shrink-0">
+                <h3 class="text-base font-extrabold text-slate-900">Review Your Selected Items</h3>
+                <p class="text-xs text-slate-500 mt-1">Please double check your order below:</p>
+            </div>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-left overflow-y-auto max-h-48 space-y-2 flex-1 my-1">
+                <template x-for="cItem in cart" :key="cItem.cartItemId">
+                    <div class="flex justify-between items-center text-xs text-slate-700 border-b border-slate-200/60 pb-2 last:border-b-0 last:pb-0">
+                        <div class="font-medium pr-2">
+                            <span class="font-bold text-amber-600" x-text="cItem.quantity + 'x'"></span>
+                            <span x-text="cItem.name"></span>
+                        </div>
+                        <span class="font-bold text-slate-900 whitespace-nowrap" x-text="'$' + (cItem.price * cItem.quantity).toFixed(2)"></span>
+                    </div>
+                </template>
+            </div>
+
+            <template x-if="orderNotes">
+                <div class="text-left bg-amber-50 p-2 rounded-xl border border-amber-200 text-xs text-amber-900">
+                    <span class="font-bold">Note:</span> <span x-text="orderNotes"></span>
+                </div>
+            </template>
+
+            <div class="flex justify-between items-center px-1 font-black text-sm text-slate-900 flex-shrink-0 border-t border-slate-100 pt-2">
+                <span>Total Amount:</span>
+                <span class="text-amber-600 text-base" x-text="'$' + cartTotalPrice.toFixed(2)"></span>
+            </div>
+
+            <div class="flex-shrink-0 pt-1 space-y-3">
+                <p class="text-xs text-slate-600 font-semibold leading-relaxed">
+                    Do you want to edit anything in your items, or shall we send the order?
+                </p>
+
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <button @click="showConfirmModal = false; showCartModal = true;" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs transition order-2 sm:order-1">
+                        ✏️ Edit Items
+                    </button>
+                    <button @click="confirmAndSubmitOrder()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl text-xs transition shadow-md order-1 sm:order-2">
+                        🚀 Send Order
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function clientApp() {
+            return {
+                restaurantWhatsappPhone: '96171999867',
+                comboExtraPrice: 3.00,
+                orderType: 'Takeaway',
+                selectedTable: 'Table 1',
+                approvedTables: {},
+                isTableApproved: false,
+
+                selectedMainCategory: 'All',
+                selectedSubCategory: 'All',
+                openMainCategories: ['Food', 'Beverages', 'Tobacco', 'Alcohol Drinks'],
+                menuItems: [],
+                cart: [],
+                orderNotes: '',
+                customerInfo: { name: '', phone: '', address: '' },
+
+                showCartModal: false,
+                showConfirmModal: false,
+                showComboModal: false,
+                selectedComboItem: null,
+
+                showSteakModal: false,
+                selectedSteakItem: null,
+                selectedDoneness: 'Medium',
+                steakOptions: ['Rare', 'Medium Rare', 'Medium', 'Medium Well', 'Well Done'],
+
+                showSoftDrinkModal: false,
+                selectedSoftDrinkItem: null,
+                selectedSoftDrinkOption: 'Pepsi',
+                softDrinkOptions: ['Pepsi', 'Pepsi Diet', 'Pepsi Zero', '7up', '7up Diet', 'Miranda'],
+
+                showImageModal: false,
+                selectedImageUrl: '',
+                selectedImageTitle: '',
+                selectedImageDescription: '',
+
+                showTrackingModal: false,
+                myOrderIds: JSON.parse(localStorage.getItem('cask_my_orders') || '[]'),
+                allOrders: [],
+
+                initClient() {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const tableParam = urlParams.get('table');
+                    if (tableParam) {
+                        let tName = tableParam.trim();
+                        if (!tName.toLowerCase().startsWith('table')) {
+                            tName = 'Table ' + tName;
+                        }
+                        this.selectedTable = tName;
+                        this.orderType = 'Dine-in';
+                    }
+
+                    db.ref('menu').on('value', (snapshot) => {
+                        const val = snapshot.val();
+                        if (val) {
+                            this.menuItems = val;
+                        }
+                    });
+
+                    db.ref('orders').on('value', (snapshot) => {
+                        const val = snapshot.val();
+                        this.allOrders = val ? Object.values(val) : [];
+                    });
+
+                    db.ref('approved_tables').on('value', (snapshot) => {
+                        this.approvedTables = snapshot.val() || {};
+                        this.checkTableApproval();
+                    });
+                },
+
+                checkTableApproval() {
+                    this.isTableApproved = !!(this.approvedTables[this.selectedTable]);
+                },
+
+                handleOrderTypeChange() {
+                    if (this.orderType === 'Dine-in') {
+                        this.checkTableApproval();
+                    }
+                },
+
+                get myActiveOrders() {
+                    return this.allOrders
+                        .filter(o => this.myOrderIds.includes(o.id) && o.status !== 'Delivered')
+                        .sort((a, b) => b.id - a.id);
+                },
+
+                get dynamicMenuStructure() {
+                    const map = {};
+                    this.menuItems.forEach(item => {
+                        const main = item.mainCategory || 'Other';
+                        const sub = item.category || 'General';
+                        if (!map[main]) map[main] = new Set();
+                        map[main].add(sub);
+                    });
+
+                    const order = ['Food', 'Beverages', 'Tobacco', 'Alcohol Drinks'];
+                    const keys = Object.keys(map).sort((a, b) => {
+                        let idxA = order.indexOf(a);
+                        let idxB = order.indexOf(b);
+                        if (idxA === -1) idxA = 99;
+                        if (idxB === -1) idxB = 99;
+                        return idxA - idxB;
+                    });
+
+                    return keys.map(main => ({
+                        mainCategory: main,
+                        subCategories: Array.from(map[main])
+                    }));
+                },
+
+                get filteredMenuItems() {
+                    return this.menuItems.filter(item => {
+                        if (this.selectedMainCategory !== 'All' && item.mainCategory !== this.selectedMainCategory) {
+                            return false;
+                        }
+                        if (this.selectedSubCategory !== 'All' && item.category !== this.selectedSubCategory) {
+                            return false;
+                        }
+                        return true;
+                    });
+                },
+
+                selectMainCategory(mainCat) {
+                    if (this.openMainCategories.includes(mainCat)) {
+                        this.openMainCategories = this.openMainCategories.filter(c => c !== mainCat);
+                    } else {
+                        this.openMainCategories.push(mainCat);
+                    }
+                },
+
+                selectCategory(mainCat, subCat) {
+                    this.selectedMainCategory = mainCat;
+                    this.selectedSubCategory = subCat;
+                },
+
+                openImageModal(item) {
+                    if (!item.image) return;
+                    this.selectedImageUrl = item.image;
+                    this.selectedImageTitle = item.name;
+                    this.selectedImageDescription = item.description || '';
+                    this.showImageModal = true;
+                },
+
+                getItemCartCount(itemId) {
+                    return this.cart
+                        .filter(c => c.id === itemId)
+                        .reduce((sum, c) => sum + c.quantity, 0);
+                },
+
+                addToCart(item) {
+                    if (this.orderType === 'Dine-in' && !this.isTableApproved) {
+                        alert('🔒 ' + this.selectedTable + ' is currently locked. You can browse the menu, but Admin must open your table before you can place an order.');
+                        return;
+                    }
+
+                    const steakDishesList = [
+                        'cask special dish',
+                        '650g cask meat dish',
+                        'mushroom filet steak dish',
+                        'picanha black angus (250g)',
+                        'tomahawk dish',
+                        'tenderloin black angus (300g)',
+                        'lahme mechwiye dish',
+                        'lahme mechwiye lamb',
+                        'kabab mechwe dish',
+                        'butter steak'
+                    ];
+
+                    const nameLower = (item.name || '').toLowerCase();
+                    const catLower = (item.category || '').toLowerCase();
+
+                    const isSoftDrinkCat = catLower === 'soft drinks can' || 
+                                          catLower === 'soft drinks plastics' || 
+                                          nameLower.includes('soft drinks can') || 
+                                          nameLower.includes('soft drinks plastics') ||
+                                          (catLower === 'cold drinks' && (
+                                              nameLower.includes('soft drink') || 
+                                              nameLower.includes('pepsi') || 
+                                              nameLower.includes('7up') || 
+                                              nameLower.includes('miranda') || 
+                                              nameLower.includes('plastic') || 
+                                              nameLower.includes('can')
+                                          ));
+
+                    if (item.category === 'Burger') {
+                        this.selectedComboItem = item;
+                        this.showComboModal = true;
+                    } else if (steakDishesList.includes(nameLower) || (item.category === 'Main Dishes' && (nameLower.includes('steak') || nameLower.includes('meat') || nameLower.includes('picanha') || nameLower.includes('tomahawk') || nameLower.includes('tenderloin') || nameLower.includes('lahme') || nameLower.includes('kabab')))) {
+                        this.selectedSteakItem = item;
+                        this.selectedDoneness = 'Medium';
+                        this.showSteakModal = true;
+                    } else if (isSoftDrinkCat) {
+                        this.selectedSoftDrinkItem = item;
+                        this.selectedSoftDrinkOption = 'Pepsi';
+                        this.showSoftDrinkModal = true;
+                    } else {
+                        this.confirmAddToCart(item, false);
+                    }
+                },
+
+                confirmAddToCart(item, isCombo, doneness = null, softDrinkOption = null) {
+                    let cartItemId = `${item.id}`;
+                    let itemName = item.name;
+                    let price = Number(item.price);
+
+                    if (isCombo) {
+                        cartItemId += '_combo';
+                        itemName += ' (Combo)';
+                        price += this.comboExtraPrice;
+                    }
+                    if (doneness) {
+                        cartItemId += `_${doneness.replace(/\s+/g, '')}`;
+                        itemName += ` [${doneness}]`;
+                    }
+                    if (softDrinkOption) {
+                        cartItemId += `_${softDrinkOption.replace(/\s+/g, '')}`;
+                        itemName += ` [${softDrinkOption}]`;
+                    }
+
+                    const existingIndex = this.cart.findIndex(c => c.cartItemId === cartItemId);
+                    if (existingIndex !== -1) {
+                        this.cart[existingIndex].quantity += 1;
+                    } else {
+                        this.cart.push({
+                            cartItemId: cartItemId,
+                            id: item.id,
+                            name: itemName,
+                            price: price,
+                            quantity: 1,
+                            isCombo: isCombo,
+                            doneness: doneness,
+                            softDrinkOption: softDrinkOption
+                        });
+                    }
+                    this.showComboModal = false;
+                    this.showSteakModal = false;
+                    this.showSoftDrinkModal = false;
+                },
+
+                decrementItemCard(itemId) {
+                    const idx = this.cart.findLastIndex(c => c.id === itemId);
+                    if (idx !== -1) {
+                        if (this.cart[idx].quantity > 1) {
+                            this.cart[idx].quantity -= 1;
+                        } else {
+                            this.cart.splice(idx, 1);
+                        }
+                    }
+                },
+
+                updateCartQuantityByCartItemId(cartItemId, delta) {
+                    const idx = this.cart.findIndex(c => c.cartItemId === cartItemId);
+                    if (idx !== -1) {
+                        this.cart[idx].quantity += delta;
+                        if (this.cart[idx].quantity <= 0) {
+                            this.cart.splice(idx, 1);
+                        }
+                    }
+                },
+
+                get cartTotalCount() {
+                    return this.cart.reduce((sum, c) => sum + c.quantity, 0);
+                },
+
+                get cartTotalPrice() {
+                    return this.cart.reduce((sum, c) => sum + (c.price * c.quantity), 0);
+                },
+
+                sendStaffCall(type) {
+                    if (!this.isTableApproved) {
+                        alert('This table is locked. Please wait for Admin activation.');
+                        return;
+                    }
+                    const callObj = {
+                        id: Date.now(),
+                        table: this.selectedTable,
+                        type: type,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    };
+                    db.ref('staff_calls/' + callObj.id).set(callObj);
+                    alert(`Request "${type}" sent to staff for ${this.selectedTable}!`);
+                },
+
+                openConfirmModal() {
+                    if (this.cart.length === 0) return;
+                    if (this.orderType === 'Dine-in' && !this.isTableApproved) {
+                        alert('🔒 ' + this.selectedTable + ' is currently locked by Admin. Please ask staff to open your table before placing an order.');
+                        return;
+                    }
+                    if (!this.customerInfo.name.trim() || !this.customerInfo.phone.trim()) {
+                        alert('Please enter your name and phone number.');
+                        return;
+                    }
+                    this.showCartModal = false;
+                    this.showConfirmModal = true;
+                },
+
+                confirmAndSubmitOrder() {
+                    if (this.orderType === 'Dine-in' && !this.isTableApproved) {
+                        alert('🔒 ' + this.selectedTable + ' is currently locked by Admin. Please ask staff to open your table before placing an order.');
+                        return;
+                    }
+
+                    const orderId = Date.now();
+                    const newOrder = {
+                        id: orderId,
+                        type: this.orderType,
+                        tableNumber: this.orderType === 'Dine-in' ? this.selectedTable : 'Takeaway / Delivery',
+                        items: this.cart,
+                        total: this.cartTotalPrice,
+                        notes: this.orderNotes,
+                        customerInfo: { ...this.customerInfo },
+                        status: 'Pending Approval',
+                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        timestampIso: new Date().toISOString()
+                    };
+
+                    db.ref('orders/' + orderId).set(newOrder).then(() => {
+                        this.myOrderIds.push(orderId);
+                        localStorage.setItem('cask_my_orders', JSON.stringify(this.myOrderIds));
+
+                        if (this.orderType === 'Takeaway') {
+                            let msg = `*NEW TAKEAWAY ORDER - CASK*\n`;
+                            msg += `*Order #:* ${orderId}\n`;
+                            msg += `*Name:* ${this.customerInfo.name}\n`;
+                            msg += `*Phone:* ${this.customerInfo.phone}\n`;
+                            if (this.customerInfo.address) msg += `*Address:* ${this.customerInfo.address}\n`;
+                            msg += `---------------------------\n`;
+                            this.cart.forEach(item => {
+                                msg += `• ${item.quantity}x ${item.name} ($${(item.price * item.quantity).toFixed(2)})\n`;
+                            });
+                            if (this.orderNotes) msg += `*Note:* ${this.orderNotes}\n`;
+                            msg += `---------------------------\n`;
+                            msg += `*Total Amount:* $${this.cartTotalPrice.toFixed(2)}`;
+
+                            const whatsappUrl = `https://wa.me/${this.restaurantWhatsappPhone}?text=${encodeURIComponent(msg)}`;
+                            window.open(whatsappUrl, '_blank');
+                        } else {
+                            alert(`Order #${orderId} submitted successfully for ${this.selectedTable}!`);
+                        }
+
+                        this.cart = [];
+                        this.orderNotes = '';
+                        this.showConfirmModal = false;
+                        this.showTrackingModal = true;
+                    }).catch(err => {
+                        alert('Error submitting order. Please try again.');
+                        console.error(err);
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
